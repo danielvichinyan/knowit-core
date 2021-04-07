@@ -1,0 +1,133 @@
+version: "3.8"
+services:
+  auth_db:
+    container_name: auth_db
+    image: postgres:13
+    restart: unless-stopped
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRESQL_USER=knowit_admin
+      - POSTGRESQL_PASSWORD=root
+      - POSTGRES_DB=auth
+    networks:
+      - knowit
+  profile_db:
+    container_name: profile_db
+    image: postgres:13
+    restart: unless-stopped
+    volumes:
+      - profile-db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRESQL_USER=profile_admin
+      - POSTGRESQL_PASSWORD=root
+      - POSTGRESQL_DB=profile
+    networks:
+      - knowit
+  gateway_db:
+    container_name: gateway_db
+    image: redis
+    restart: unless-stopped
+    volumes:
+      - gateway-db-data:/var/lib/etc/redis/data
+    ports:
+      - 6379:6379
+    networks:
+      - knowit
+  zookeeper:
+    container_name: zookeeper
+    image: wurstmeister/zookeeper
+    ports:
+      - 2181:2181
+    environment:
+      zk_id: 1
+    networks:
+      - knowit
+  kafka:
+    container_name: kafka
+    image: wurstmeister/kafka
+    ports:
+      - 9092:9092
+    environment:
+      - KAFKA_ZOOKEEPER=zookeeper:2181
+      - KAFKA_HOST_NAME=kafka
+      - KAFKA_PORT=9092
+    depends_on:
+      - zookeeper
+    networks:
+      - knowit
+  service-discovery:
+    container_name: service-discovery
+    build: ../service-discovery
+    hostname: service-discovery
+    restart: on-failure
+    ports:
+      - 8761:8761
+    networks:
+      - knowit
+  auth:
+    container_name: auth
+    build: ../auth
+    restart: on-failure
+    ports:
+      - 8081:8081
+    environment:
+      - DB_HOST=auth_db
+      - DB_PORT=5432
+      - DB_NAME=auth
+      - DB_USER=knowit_admin
+      - DB_PASS=root
+      - EUREKA_NAME=service-discovery
+      - KAFKA_HOST=kafka
+      - SECRET_JWT=danielvichinyan
+      - REDIS_KEY=JwtKey
+    networks:
+      - knowit
+    depends_on:
+      - auth_db
+      - service-discovery
+      - kafka
+  profile:
+    container_name: profile
+    build: ../profile
+    restart: on-failure
+    ports:
+      - 8082:8082
+    environment:
+      - DB_HOST=profile_db
+      - DB_PORT=5432
+      - DB_NAME=profile
+      - DB_USER=profile_admin
+      - DB_PASS=root
+      - EUREKA_NAME=service-discovery
+      - KAFKA_HOST=kafka
+    networks:
+      - knowit
+    depends_on:
+      - profile_db
+      - service-discovery
+      - kafka
+  gateway:
+    container_name: gateway
+    build: ../gateway
+    restart: on-failure
+    ports:
+      - 8762:8762
+    environment:
+      - EUREKA_NAME=service-discovery
+      - SERCRET_JWT=danielvichinyan
+      - REDIS_HOST=gateway_db
+      - REDIS_PORT=6379
+    networks:
+      - knowit
+    depends_on:
+      - auth
+      - service-discovery
+      - profile_db
+      - gateway_db
+  volumes:
+    auth-db-data:
+    profile-db-data:
+    gateway-db-data:
+  networks:
+    knowit:
