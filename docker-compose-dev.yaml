@@ -1,0 +1,129 @@
+version: "3.8"
+services:
+  profile_db:
+    container_name: profile-db-staging
+    image: postgres
+    restart: unless-stopped
+    hostname: profile-db-container
+    volumes:
+      - profile-volume:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_DB=profile
+    networks:
+      -  knowit-staging-network
+  auth_db:
+    container_name: auth-db-staging
+    image: postgres
+    restart: unless-stopped
+    hostname: auth-db-container
+    volumes:
+      - auth-volume:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=codexio
+      - POSTGRES_PASSWORD=1234
+      - POSTGRES_DB=auth
+    networks:
+      - knowit-staging-network
+  zookeeper:
+    container_name: zookeeper
+    image:  wurstmeister/zookeeper
+    ports:
+      - 2181:2181
+    environment:
+      zk_id: 1
+    networks:
+      - knowit-staging-network
+  kafka:
+    container_name: kafka
+    image: wurstmeister/kafka
+    ports:
+      - 9092:9092
+    environment:
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ADVERTISED_HOST_NAME=kafka
+      - KAFKA_ADVERTISED_PORT=9092
+    depends_on:
+      - zookeeper
+    networks:
+      - knowit-staging-network
+  service-discovery:
+    container_name: service-discovery-staging
+    hostname: service-discovery-container
+    build:
+      context: ../service-discovery
+      dockerfile: dev-Dockerfile
+    environment:
+      - ACTIVE_PROFILE=staging
+    restart: on-failure
+    ports:
+      - 8761:8761
+    networks:
+      - knowit-staging-network
+  auth:
+    container_name: auth-staging
+    build:
+      context: ../auth
+      dockerfile: dev-Dockerfile
+    restart: on-failure
+    ports:
+      - 8081:8081
+    environment:
+      - PORT=8081
+      - ACTIVE_PROFILE=staging
+      - POSTGRES_USER=codexio
+      - POSTGRES_PASSWORD=1234
+      - POSTGRES_DB=auth
+      - DB_HOSTNAME=auth_db
+      - DB_PORT=5432
+      - JWT_SECRET=bezKoderSecretKey
+    networks:
+      - knowit-staging-network
+    depends_on:
+      - auth_db
+      - service-discovery
+      - kafka
+  profile:
+    container_name: profile-staiging
+    build:
+      context: ../profile
+      dockerfile: dev-Dockerfile
+    restart: on-failure
+    ports:
+      - 8082:8082
+    environment:
+      - PORT=8082
+      - ACTIVE_PROFILE=staging
+      - POSTGRES_DB=profile
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=root
+    networks:
+      - knowit-staging-network
+    depends_on:
+      - profile_db
+      - service-discovery
+      - kafka
+  gateway:
+    container_name: gateway-staging
+    build:
+      context: ../gateway
+      dockerfile: dev-Dockerfile
+    restart: on-failure
+    ports:
+      - 8762:8762
+    environment:
+      - ACTIVE_PROFILE=staging
+      - JWT_SECRET=bezKoderSecretKey
+      - PORT=8762
+    networks:
+      - knowit-staging-network
+    depends_on:
+      - service-discovery
+      - auth
+      - profile
+volumes:
+  auth-volume:
+  profile-volume:
+networks:
+  knowit-staging-network:
