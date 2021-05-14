@@ -32,7 +32,7 @@ services:
     environment:
       zk_id: 1
     networks:
-      - ungamified
+      - knowit
   kafka:
     container_name: kafka
     image: wurstmeister/kafka
