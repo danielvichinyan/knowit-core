@@ -24,6 +24,16 @@ services:
       - POSTGRES_DB=auth
     networks:
       - knowit
+  gateway_db:
+    container_name: gateway-db
+    image: redis
+    restart: unless-stopped
+    volumes:
+      - gateway-db-data:/var/lib/etc/redis/data
+    ports:
+      - 6379:6379
+    networks:
+      - knowit
   zookeeper:
     container_name: zookeeper
     image:  wurstmeister/zookeeper
@@ -73,6 +83,7 @@ services:
       - EUREKA_HOSTNAME=service-discovery
       - KAFKA_HOST=kafka
       - JWT_SECRET=bezKoderSecretKey
+      - REDIS_KEY=JwtKey
     networks:
       - knowit
     depends_on:
@@ -110,14 +121,42 @@ services:
       - EUREKA_HOSTNAME=service-discovery
       - ACTIVE_PROFILE=production
       - JWT_SECRET=bezKoderSecretKey
+      - REDIS_HOSTNAME=gateway_db
+      - REDIS_PORT=6379
     networks:
       - knowit
     depends_on:
       - auth
       - service-discovery
       - profile
+      - gateway_db
+  web-client:
+    container_name: web-client
+    build:
+      context: ../web-client
+    restart: on-failure
+    networks:
+      - knowit
+  proxy:
+    container_name: proxy
+    build:
+      context: ../proxy
+    restart: on-failure
+    ports:
+      - 80:80
+    environment:
+      - PORT=80
+      - SERVER_NAME=localhost
+      - WEB_CLIENT=web-client
+      - BACKEND=gateway
+      - BACKEND_PORT=8762
+    depends_on:
+      - web-client
+    networks:
+      - knowit
 volumes:
   auth-db-data:
   profile-db-data:
+  gateway-db-data:
 networks:
   knowit:
