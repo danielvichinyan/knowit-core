@@ -130,6 +130,19 @@ services:
       - service-discovery
       - profile
       - gateway_db
+  file-manager:
+    container_name: file-manager
+    build: ../file-manager
+    restart: on-failure
+    ports:
+      - 8084:8084
+    environment:
+      - ACTIVE_PROFILE=production
+      - EUREKA_HOSTNAME=service-discovery
+    networks:
+      - knowit
+    depends_on:
+      - service-discovery
   web-client:
     container_name: web-client
     build:
