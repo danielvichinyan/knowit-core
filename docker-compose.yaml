@@ -1,5 +1,17 @@
 version: "3.8"
 services:
+  lectures_db:
+    container_name: lectures_db
+    image: postgres:13
+    restart: unless-stopped
+    volumes:
+      - lectures-db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=lectures_admin
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_DB=lectures
+    networks:
+      - knowit
   profile_db:
     container_name: profile_db
     image: postgres:13
@@ -167,9 +179,31 @@ services:
       - web-client
     networks:
       - knowit
+  lectures:
+    container_name: lectures
+    build: ../lectures
+    restart: on-failure
+    ports:
+      - 8083:8083
+    environment:
+      - ACTIVE_PROFILE=production
+      - DB_HOSTNAME=lectures_db
+      - DB_PORT=5432
+      - DB_NAME=lectures
+      - DB_USER=lectures_admin
+      - DB_PASS=root
+      - EUREKA_HOSTNAME=service-discovery
+      - KAFKA_HOST=kafka
+    depends_on:
+      - lectures_db
+      - service-discovery
+      - kafka
+    networks:
+      - knowit
 volumes:
   auth-db-data:
   profile-db-data:
   gateway-db-data:
+  lectures-db-data:
 networks:
   knowit:
