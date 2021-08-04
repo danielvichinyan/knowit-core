@@ -159,7 +159,10 @@ services:
     container_name: web-client
     build:
       context: ../web-client
+      dockerfile: Dockerfile
     restart: on-failure
+    volumes:
+      - ./web-client:/app
     networks:
       - knowit
   proxy:
